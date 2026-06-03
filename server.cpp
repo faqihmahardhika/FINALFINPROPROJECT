@@ -1,3 +1,9 @@
+/*
+RUN MENGGUNAKAN KODE INI DI TERMINAL, AKAN TERCIPTA server.exe dan client.exe:
+g++ server.cpp -o server -lws2_32
+g++ client.cpp -o client -lws2_32
+*/
+
 #include <iostream>
 #include <string>
 #include <limits>
@@ -7,8 +13,9 @@
 #include <sstream>   
 #include <chrono>    
 #include <thread>    
-#include <winsock2.h>
 
+// Header Socket
+#include <winsock2.h
 #pragma comment(lib, "ws2_32.lib")
 
 using namespace std;
@@ -49,6 +56,7 @@ public:
     virtual void displayOptions() = 0;
     virtual string getOptionsString() = 0;
 
+    // Setter & Getter
     int getHP() const { return HP; }
     void setHP(int newHP) { HP = newHP; }
     string getName() const { return name; }
@@ -153,7 +161,7 @@ public:
 };
 
 // Fungsi Helper untuk Serialize 1 Log ke Format JSON
-string logToJson(const LogEntry& log, bool isLast) {
+string logToJson(const LogEntry& log) {
     stringstream ss;
     ss << "  {\n"
        << "    \"turn\": " << log.turn << ",\n"
@@ -167,15 +175,10 @@ string logToJson(const LogEntry& log, bool isLast) {
        << "    \"swordSaintEnergy\": " << log.swordSaintEnergy << ",\n"
        << "    \"archmageEnergy\": " << log.archmageEnergy << "\n"
        << "  }";
-    if (!isLast) ss << ",";
     ss << "\n";
     return ss.str();
 }
 
-// Menampilkan 1 Log ke Terminal
-void printSingleLog(const LogEntry& log) {
-    cout << logToJson(log, true);
-}
 
 // Menampilkan Semua Log ke Terminal
 void printAllLogs(const vector<LogEntry>& logs) {
@@ -185,7 +188,7 @@ void printAllLogs(const vector<LogEntry>& logs) {
     }
     cout << "[\n";
     for (size_t i = 0; i < logs.size(); ++i) {
-        cout << logToJson(logs[i], i == logs.size() - 1);
+        cout << logToJson(logs[i]);
     }
     cout << "]\n";
 }
@@ -193,20 +196,20 @@ void printAllLogs(const vector<LogEntry>& logs) {
 // Menyimpan Semua Log ke JSON File
 void saveLogsToJSON(const vector<LogEntry>& logs, const string& filename = "battle_log.json") {
     ofstream filePointer(filename);
-    if (!filePointer.is_open()) {
+    if (!filePointer.is_open()) { 
         cout << "Failed to save logs to " << filename << "!\n";
         return;
     }
     filePointer << "[\n";
     for (size_t i = 0; i < logs.size(); ++i) {
-        filePointer << logToJson(logs[i], i == logs.size() - 1);
+        filePointer << logToJson(logs[i]);
     }
     filePointer << "]\n";
     filePointer.close();
     cout << "Success! Logs saved to " << filename << "\n";
 }
 
-// Generic Selection Sort berdasarkan Field (Manual Sort)
+// Sorting untuk log
 void selectionSortLogs(vector<LogEntry>& logs, int fieldChoice, bool isAscending) {
     int n = logs.size();
     for (int i = 0; i < n - 1; i++) {
@@ -239,7 +242,7 @@ void selectionSortLogs(vector<LogEntry>& logs, int fieldChoice, bool isAscending
     }
 }
 
-// Sub-menu Sorting
+// Tampilan/interface submenu untuk mengarahkan user untuk memilih sorting mana yang akan dilakukan
 void handleSortingMenu(vector<LogEntry>& logs) {
     int field, order;
     cout << "\n=== SORT LOGS ===\n";
@@ -261,16 +264,16 @@ void handleSortingMenu(vector<LogEntry>& logs) {
     printAllLogs(logs);
 }
 
-// Sub-menu Searching (Linear Search)
+// Tampilan/interface submenu untuk mengarahkan user untuk memilih searching mana yang akan dilakukan
 void handleSearchingMenu(const vector<LogEntry>& logs) {
     cout << "\n=== SEARCH LOGS (Critical Condition) ===\n";
     bool found = false;
     
-    // Linear search mencari kondisi kritis
+    // Linear search mencari kondisi kritis saint/mage
     cout << "[\n";
     for (size_t i = 0; i < logs.size(); ++i) {
         if (logs[i].swordSaintHP < 70 || logs[i].archmageHP < 65) {
-            cout << logToJson(logs[i], true);
+            cout << logToJson(logs[i]);
             found = true;
         }
     }
@@ -313,10 +316,11 @@ void displayMenu(vector<LogEntry>& logs) {
 }
 
 
-
 // ==========================================
 // 4. SOCKET & GAME LOGIC
 // ==========================================
+
+
 void sendData(SOCKET sock, string msg) {
     send(sock, msg.c_str(), msg.length(), 0);
     this_thread::sleep_for(chrono::milliseconds(100)); 
@@ -328,49 +332,77 @@ string receiveData(SOCKET sock) {
     return string(buffer);
 }
 
-int handleRockPaperScissors(SOCKET p1, SOCKET p2) {
+int handleSuit(SOCKET p1, SOCKET p2) {
     while (true) {
         sendData(p1, "\n=== ROCK PAPER SCISSORS ===\n1. Rock\n2. Paper\n3. Scissors\nYour choice: ");
         sendData(p2, "\n=== ROCK PAPER SCISSORS ===\n1. Rock\n2. Paper\n3. Scissors\nYour choice: ");
 
-        string move1 = receiveData(p1);
+        // Ambil data dari player: 1, 2 atau 3
+        string move1 = receiveData(p1); 
         string move2 = receiveData(p2);
 
+        // Ubah data menjadi integer (awalnya masih string)
         int m1 = atoi(move1.c_str());
         int m2 = atoi(move2.c_str());
 
+        // Kondisi seri
         if (m1 == m2) {
             sendData(p1, "Draw! Retrying...\n");
             sendData(p2, "Draw! Retrying...\n");
             continue;
         }
 
+        // Kondusi menang untuk player 1 dan player 2
         if ((m1 == 1 && m2 == 3) || (m1 == 2 && m2 == 1) || (m1 == 3 && m2 == 2)) {
             sendData(p1, "You earned the first turn!! You go first.\n");
             sendData(p2, "You lose the first turn!! You go second.\n");
-            return 1; 
+            return 1; // Player 1 duluan jika nilai return 1
         } else {
             sendData(p1, "You lose the first turn!! You go second.\n");
             sendData(p2, "You earned the first turn!! You go first.\n");
-            return 2; 
+            return 2; // Player 2 duluan jika nilai return 2
         }
     }
 }
 
+// Fungsi untuk menampilkan notifikasi serangan paada masing-masing dan menambahkan log
 string executeCharacterTurn(Character* attacker, Character* defender, int choice, BattleLogger& logger) {
     stringstream report;
     string actionName = "";
 
     if (attacker->getName() == "Sword Saint") {
         SwordSaint* ss = static_cast<SwordSaint*>(attacker);
-        if (choice == 1) { ss->useWeapon(); actionName = "Basic Attack"; report << "The sword saint swings their sword!\n"; }
-        else if (choice == 2) { ss->iaiSlash(); actionName = "Iai Slash"; report << (ss->getDamage() > 0 ? "The sword saint performs their iai slash!\n" : "The sword saint cannot use their iai slash yet!\n"); }
-        else if (choice == 3) { ss->mountainSplitter(); actionName = "Mountain Splitter"; report << (ss->getDamage() > 0 ? "The sword saint performs their mountain splitter!\n" : "The sword saint does not have enough energy!\n"); }
+        if (choice == 1) { 
+            ss->useWeapon(); 
+            actionName = "Basic Attack"; 
+            report << "The sword saint swings their sword!\n"; 
+        }
+        else if (choice == 2) { 
+            ss->iaiSlash(); 
+            actionName = "Iai Slash"; 
+            report << (ss->getDamage() > 0 ? "The sword saint performs their iai slash!\n" : "The sword saint cannot use their iai slash yet!\n"); 
+        }
+        else if (choice == 3) { 
+            ss->mountainSplitter(); 
+            actionName = "Mountain Splitter"; 
+            report << (ss->getDamage() > 0 ? "The sword saint performs their mountain splitter!\n" : "The sword saint does not have enough energy!\n"); }
     } else {
         Archmage* am = static_cast<Archmage*>(attacker);
-        if (choice == 1) { am->useWeapon(); actionName = "Basic Attack"; report << "The archmage casts their spell!\n"; }
-        else if (choice == 2) { am->beamBlast(); actionName = "Beam Blast"; report << (am->getDamage() > 0 ? "The archmage casts beam blast!\n" : "The archmage cannot use their beam blast yet!\n"); }
-        else if (choice == 3) { am->explosion(); actionName = "Explosion"; report << (am->getDamage() > 0 ? "The archmage casts explosion!\n" : "The archmage cannot cast explosion yet!\n"); }
+        if (choice == 1) { 
+            am->useWeapon(); 
+            actionName = "Basic Attack"; 
+            report << "The archmage casts their spell!\n"; 
+        }
+        else if (choice == 2) { 
+            am->beamBlast(); 
+            actionName = "Beam Blast"; 
+            report << (am->getDamage() > 0 ? "The archmage casts beam blast!\n" : "The archmage cannot use their beam blast yet!\n"); 
+        }
+        else if (choice == 3) { 
+            am->explosion(); 
+            actionName = "Explosion"; 
+            report << (am->getDamage() > 0 ? "The archmage casts explosion!\n" : "The archmage cannot cast explosion yet!\n"); 
+        }
     }
 
     if (actionName != "" && attacker->getDamage() >= 0) {
@@ -426,15 +458,18 @@ int main() {
     Archmage* AM = new Archmage();
     BattleLogger logger;
 
-    int suwitResult = handleRockPaperScissors(player1, player2);
+    int suitResult = handleSuit(player1, player2);
 
-    SOCKET firstSocket = (suwitResult == 1) ? player1 : player2;
-    SOCKET secondSocket = (suwitResult == 1) ? player2 : player1;
-    Character* firstChar = (suwitResult == 1) ? static_cast<Character*>(SS) : static_cast<Character*>(AM);
-    Character* secondChar = (suwitResult == 1) ? static_cast<Character*>(AM) : static_cast<Character*>(SS);
+    // Setiap socket menempati posisi masing-masing setelah melakukan suit
 
+    SOCKET firstSocket = (suitResult == 1) ? player1 : player2; // Jika hasil suit == 1, maka socket 1 menjadi socket pertama, dan sebaliknya
+    SOCKET secondSocket = (suitResult == 1) ? player2 : player1;
+    Character* firstChar = (suitResult == 1) ? static_cast<Character*>(SS) : static_cast<Character*>(AM); // Jika hasil suit == 1, maka Character 1 menjadi Character pertama, dan sebaliknya
+    Character* secondChar = (suitResult == 1) ? static_cast<Character*>(AM) : static_cast<Character*>(SS);
+
+    // Bertarung dalam loop sampai salah satu kehabisan health point 
     do {
-        // --- GILIRAN PEMAIN PERTAMA ---
+        // GILIRAN PEMAIN PERTAMA
         sendData(firstSocket, firstChar->getOptionsString());
         sendData(secondSocket, "\nWaiting for " + firstChar->getName() + " to move...\n");
         
@@ -442,13 +477,13 @@ int main() {
         string report1 = executeCharacterTurn(firstChar, secondChar, choiceFirst, logger);
         
         sendData(firstSocket, report1);
-        this_thread::sleep_for(chrono::milliseconds(300));
+        this_thread::sleep_for(chrono::milliseconds(300)); // Beri jeda biar lebih natural aja
         sendData(secondSocket, report1);
         this_thread::sleep_for(chrono::milliseconds(300));
 
         if (secondChar->getHP() <= 0) break;
 
-        // --- GILIRAN PEMAIN KEDUA ---
+        // GILIRAN PEMAIN KEDUA
         sendData(secondSocket, secondChar->getOptionsString());
         sendData(firstSocket, "\nWaiting for " + secondChar->getName() + " to move...\n");
         
@@ -466,7 +501,7 @@ int main() {
 
     } while (SS->getHP() > 0 && AM->getHP() > 0);
 
-    // --- AKHIR PERTANDINGAN ---
+    // AKHIR PERTANDINGAN
     string finalResult = "";
     if (SS->getHP() > 0 && AM->getHP() <= 0) finalResult = "\nThe sword saint emerges victorious.\n";
     else if (AM->getHP() > 0 && SS->getHP() <= 0) finalResult = "\nThe archmage emerges victorious.\n";
